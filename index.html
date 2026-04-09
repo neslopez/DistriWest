@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>DISTRIWEST</title>
+  <link rel="icon" href="logo.png" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <img src="logo.png" alt="logo" class="logo">
+      <div class="brand">
+        <h1>DISTRIWEST</h1>
+        <p class="tag">Distribuidora mayorista</p>
+      </div>
+    </div>
+
+    <div class="header-actions no-imprimir">
+      <button id="btnBackup" class="btn">Backup</button>
+      
+    </div>
+  </header>
+
+  <nav class="controls no-imprimir">
+    <div class="left-controls">
+      <button id="btnAgregar" class="btn primary">➕ Nuevo Producto</button>
+
+      <label class="small">Categoría</label>
+      <div class="cat-row">
+        <select id="filtroCategoria" class="select">
+          <option value="todas">Todas las categorías</option>
+          <option value="destacados">Destacados</option>
+          <option value="ofertas">Ofertas</option>
+        </select>
+        <input id="nuevaCategoria" placeholder="Agregar categoría" class="input-small" />
+        <button id="btnAddCategoria" class="btn small">Agregar</button>
+      </div>
+    </div>
+
+    <div class="right-controls">
+      <label class="small">Ordenar</label>
+      <select id="orden" class="select">
+        <option value="default">Por defecto</option>
+        <option value="nombre_asc">Nombre ↑</option>
+        <option value="nombre_desc">Nombre ↓</option>
+        <option value="precio_asc">Precio ↑</option>
+        <option value="precio_desc">Precio ↓</option>
+      </select>
+
+      <button id="btnPDF" class="btn accent">📄 Generar PDF</button>
+      <button id="btnLimpiar" class="btn outline">🧹 Limpiar todo</button>
+    </div>
+  </nav>
+
+  <main>
+    <section id="dashboard" class="dashboard no-imprimir">
+      <div class="card-stat">
+        <strong id="statTotal">0</strong>
+        <span>Productos</span>
+      </div>
+      <div class="card-stat">
+        <strong id="statOfertas">0</strong>
+        <span>Ofertas</span>
+      </div>
+      <div class="card-stat">
+        <strong id="statDestacados">0</strong>
+        <span>Destacados</span>
+      </div>
+      <div class="card-stat">
+        <strong id="statCategorias">0</strong>
+        <span>Categorías</span>
+      </div>
+    </section>
+
+    <section id="contenedorProductos" class="grid"></section>
+  </main>
+
+  <!-- Modal Producto -->
+  <div id="modal" class="modal oculto" aria-hidden="true">
+    <div class="modal-contenido">
+      <h2 id="modalTitulo">Agregar producto</h2>
+
+      <label>Nombre</label>
+      <input id="nombre" type="text" class="input" />
+
+      <label>Precio</label>
+      <input id="precio" type="number" class="input" />
+
+      <label>Categoría</label>
+      <select id="categoria" class="input"></select>
+
+      <label>Imagen</label>
+      <input id="imagen" type="file" accept="image/*" />
+      <img id="preview" class="preview" alt="preview">
+
+      <div class="checks">
+        <label><input id="destacado" type="checkbox"> Destacado</label>
+        <label><input id="oferta" type="checkbox"> Oferta</label>
+      </div>
+
+      <div class="modal-actions">
+        <button id="guardar" class="btn primary">Guardar</button>
+        <button id="cancelar" class="btn outline">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer no-imprimir">
+    <small>DISTRIWEST — Catálogo digital</small>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

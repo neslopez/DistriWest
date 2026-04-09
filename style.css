@@ -1,0 +1,171 @@
+:root{
+  --azul:#0074D9;
+  --amarillo:#FFCC00;
+  --gris:#f5f7fb;
+  --texto:#222;
+  --accent:#003f8a;
+  --danger:#d9534f;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  background:var(--gris); color:var(--texto);
+}
+
+/* HEADER */
+.header{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:14px 20px; background:linear-gradient(90deg,#fff, #fbfdff);
+  border-bottom:4px solid rgba(0,0,0,0.03);
+}
+.header-left{display:flex;align-items:center;gap:12px}
+.logo{width:68px;height:auto;border-radius:8px}
+.brand h1{margin:0;font-size:20px;color:var(--azul)}
+.brand .tag{margin:0;font-size:12px;color:#666}
+
+/* CONTROLS */
+.controls{display:flex;justify-content:space-between;align-items:center;padding:12px 20px;gap:10px;background:white;border-bottom:1px solid #eee;flex-wrap:wrap}
+.controls .left-controls, .controls .right-controls{display:flex;align-items:center;gap:10px}
+
+.btn{padding:8px 12px;border-radius:8px;border:none;background:var(--azul);color:white;cursor:pointer;font-weight:600}
+.btn.small{padding:6px 8px;font-size:13px}
+.btn.outline{background:white;color:var(--azul);border:1px solid var(--azul)}
+.btn.primary{background:var(--amarillo);color:#222}
+.btn.accent{background:var(--accent)}
+
+.select, .input, .input-small{padding:8px;border-radius:8px;border:1px solid #ddd}
+.input-small{width:160px}
+.cat-row{display:flex;gap:8px;align-items:center}
+
+/* DASHBOARD */
+.dashboard{display:flex;gap:12px;padding:12px 20px}
+.card-stat{background:white;padding:12px;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.04);min-width:120px;text-align:center}
+.card-stat strong{display:block;font-size:18px;color:var(--azul)}
+
+/* GRID */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;padding:20px}
+.producto{background:white;border-radius:10px;padding:10px;box-shadow:0 6px 20px rgba(2,6,23,0.06);position:relative;overflow:hidden}
+.producto img{width:100%;height:150px;object-fit:cover;border-radius:6px}
+.producto h3{margin:8px 0 4px;font-size:16px}
+.producto p{margin:0;color:#444}
+.acciones{display:flex;gap:6px;justify-content:center;margin-top:8px}
+.acciones button{padding:8px 10px;border-radius:8px;font-size:14px}
+.badge{position:absolute;left:10px;top:10px;padding:6px 8px;border-radius:6px;color:white;font-weight:700;font-size:12px}
+
+/* destacados y ofertas */
+.producto.destacado{box-shadow:0 6px 20px rgba(255,200,0,0.12);border:2px solid #ffd700}
+.producto.oferta{border:2px solid #d9534f}
+.badge.destacado{background:#ffd700;color:#111}
+.badge.oferta{background:#d9534f}
+
+/* MODAL */
+.modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);z-index:999}
+.modal-contenido{width:360px;background:white;padding:18px;border-radius:10px;box-shadow:0 10px 40px rgba(2,6,23,0.2)}
+.preview{width:100%;height:120px;object-fit:cover;border-radius:6px;margin:8px 0}
+
+/* FOOTER */
+.footer{text-align:center;padding:12px;color:#666}
+
+/* responsive */
+@media (max-width:720px){
+  .controls{flex-direction:column;align-items:stretch}
+  .grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
+  .modal-contenido{width:92%}
+}
+
+/* hide in print where needed */
+.no-imprimir{display:flex}
+@media print{.no-imprimir{display:none !important}}
+
+/* FIX real: el modal debe estar arriba de todo */
+.modal {
+  z-index: 5000 !important;
+  pointer-events: auto !important;
+}
+
+/* El contenido también debe aceptar clicks */
+.modal-contenido {
+  z-index: 6000 !important;
+  pointer-events: auto !important;
+}
+
+/* Que el botón Cancelar reciba el click sí o sí */
+#cancelar {
+  position: relative;
+  z-index: 7000 !important;
+  cursor: pointer;
+}
+/* Modal siempre arriba */
+#modal {
+  z-index: 99999 !important;
+  pointer-events: auto !important;
+}
+
+/* Contenedor clickable */
+#modal .modal-contenido {
+  z-index: 100000 !important;
+  pointer-events: auto !important;
+}
+
+/* Botón cancelar asegurado */
+#cancelar {
+  cursor: pointer !important;
+  z-index: 200000 !important;
+  pointer-events: auto !important;
+}
+.oculto {
+  display: none !important;
+}
+
+@media (max-width: 480px){
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .brand h1 {
+    font-size: 18px;
+  }
+
+  .controls {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .controls .left-controls,
+  .controls .right-controls {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  .input-small {
+    width: 100%;
+  }
+
+  .cat-row {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .grid {
+    grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+  }
+
+  .producto img {
+    height: 120px;
+  }
+
+  .acciones {
+    flex-direction: row;
+  }
+
+}
