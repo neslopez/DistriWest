@@ -422,42 +422,22 @@ function restaurarDesdeArchivo(e) {
   reader.readAsText(file);
 }
 
-/* ---------- PDF: 9 productos por hoja (3×3), imágenes grandes ---------- */
+/* ---------- PDF: flujo libre, titulo pegado a primera fila ---------- */
 function generarPDF() {
   const lista = obtenerListaFiltrada();
   if (!lista.length) return mostrarAlerta("No hay productos para generar el PDF.");
 
-  /*
-   * Dimensiones objetivo (A4 portrait, márgenes 0.4in en html2pdf):
-   *   Área útil ≈ 714px de ancho (a scale:2 internamente)
-   *   3 columnas → cada card ≈ 220px de ancho
-   *   3 filas    → cada card ≈ altura libre ≈ 270px
-   *   Imagen ocupa la mayor parte: 190px de alto
-   */
-  const CARD_W   = "210px";
-  const IMG_H    = "165px";
-  const GAP      = "8px";
-  const COLS     = 3;
+  const CARD_W = "210px";
+  const IMG_H  = "165px";
+  const GAP    = "8px";
+  const COLS   = 3;
 
   const pdfDiv = document.createElement("div");
-  pdfDiv.style.cssText = `
-    font-family: Arial, sans-serif;
-    padding: 6px;
-    width: 100%;
-    box-sizing: border-box;
-  `;
+  pdfDiv.style.cssText = "font-family: Arial, sans-serif; padding: 6px; width: 100%; box-sizing: border-box;";
 
-  /* ---- Header ---- */
+  /* Header */
   const header = document.createElement("div");
-  header.style.cssText = `
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 14px;
-    margin-bottom: 10px;
-    padding-bottom: 8px;
-    border-bottom: 2px solid #0074D9;
-  `;
+  header.style.cssText = "display:flex; align-items:center; justify-content:center; gap:14px; margin-bottom:10px; padding-bottom:8px; border-bottom:2px solid #0074D9;";
 
   const logo = document.createElement("img");
   logo.src = "logo.png";
@@ -470,150 +450,114 @@ function generarPDF() {
   h1.textContent = "DistriWest";
   h1.style.cssText = "margin:0; font-size:20px; color:#0074D9;";
   const h2 = document.createElement("div");
-  h2.textContent = `Catálogo — ${new Date().toLocaleDateString("es-AR")}`;
+  h2.textContent = "Catalogo - " + new Date().toLocaleDateString("es-AR");
   h2.style.cssText = "font-size:11px; color:#555; margin-top:2px;";
   htxt.appendChild(h1);
   htxt.appendChild(h2);
   header.appendChild(htxt);
   pdfDiv.appendChild(header);
 
-  /* ---- Productos agrupados por categoría ---- */
-  const categoriasPDF = [...new Set(lista.map(p => p.categoria || "Sin categoría"))];
+  /* Categorias */
+  const categoriasPDF = [...new Set(lista.map(p => p.categoria || "Sin categoria"))];
 
   categoriasPDF.forEach(cat => {
-    /* Título de categoría */
+    const prodsCat = lista.filter(p => (p.categoria || "Sin categoria") === cat);
+
+    /* Titulo: independiente con break-after:avoid
+       -> el motor no puede poner un salto entre el titulo y la fila siguiente
+       -> no hay bloque rigido que envuelva titulo+fila, por lo tanto no genera hueco */
     const secTitle = document.createElement("h2");
     secTitle.textContent = cat;
-    secTitle.style.cssText = `
-      background: #0074D9;
-      color: white;
-      padding: 5px 10px;
-      border-radius: 4px;
-      margin: 12px 0 8px 0;
-      font-size: 13px;
-      page-break-after: avoid;
-    `;
+    secTitle.style.cssText = [
+      "background:#0074D9",
+      "color:white",
+      "padding:7px 12px",
+      "border-radius:4px",
+      "margin:12px 0 8px 0",
+      "font-size:16px",
+      "break-after:avoid",
+      "page-break-after:avoid"
+    ].join(";") + ";";
     pdfDiv.appendChild(secTitle);
 
-    const prodsCat = lista.filter(p => (p.categoria || "Sin categoría") === cat);
+    /* Filas de 3 cards, cada fila indivisible */
+    for (let i = 0; i < prodsCat.length; i += COLS) {
+      const fila = prodsCat.slice(i, i + COLS);
 
-    /* Dividimos en grupos de 9 (= 1 hoja) para forzar saltos limpios */
-    for (let i = 0; i < prodsCat.length; i += 9) {
-      const grupo = prodsCat.slice(i, i + 9);
+      const wrapper = document.createElement("div");
+      wrapper.style.cssText = "page-break-inside:avoid; break-inside:avoid; margin-bottom:0;";
 
       const grid = document.createElement("div");
-      grid.style.cssText = `
-        display: grid;
-        grid-template-columns: repeat(${COLS}, ${CARD_W});
-        gap: ${GAP};
-        justify-content: center;
-        page-break-inside: avoid;
-        margin-bottom: 6px;
-      `;
+      grid.style.cssText = [
+        "display:grid",
+        "grid-template-columns:repeat(" + COLS + "," + CARD_W + ")",
+        "gap:" + GAP,
+        "justify-content:center",
+        "margin-bottom:8px"
+      ].join(";") + ";";
 
-      grupo.forEach(p => {
+      fila.forEach(p => {
         const card = document.createElement("div");
-        card.style.cssText = `
-          width: ${CARD_W};
-          border: 1px solid #ddd;
-          border-radius: 6px;
-          padding: 6px;
-          text-align: center;
-          box-sizing: border-box;
-          background: #fff;
-          ${p.destacado ? "border: 2px solid #ffd700; box-shadow: 0 0 0 2px rgba(255,215,0,0.15);" : ""}
-          ${p.oferta    ? "border: 2px solid #d9534f;" : ""}
-        `;
+        let cardCss = [
+          "width:" + CARD_W,
+          "border:1px solid #ddd",
+          "border-radius:6px",
+          "padding:6px",
+          "text-align:center",
+          "box-sizing:border-box",
+          "background:#fff"
+        ];
+        if (p.destacado) {
+          cardCss.push("border:2px solid #ffd700");
+          cardCss.push("box-shadow:0 0 0 2px rgba(255,215,0,0.15)");
+        }
+        if (p.oferta) cardCss.push("border:2px solid #d9534f");
+        card.style.cssText = cardCss.join(";") + ";";
 
-        /* Badge */
         if (p.destacado || p.oferta) {
           const et = document.createElement("div");
-          et.style.cssText = `
-            font-size: 10px;
-            font-weight: 700;
-            margin-bottom: 4px;
-            color: ${p.destacado ? "#b58300" : "#b30000"};
-          `;
-          et.textContent = p.destacado ? "⭐ DESTACADO" : "🔥 OFERTA";
+          et.style.cssText = "font-size:10px; font-weight:700; margin-bottom:4px; color:" + (p.destacado ? "#b58300" : "#b30000") + ";";
+          et.textContent = p.destacado ? "DESTACADO" : "OFERTA";
           card.appendChild(et);
         }
 
-        /* Imagen */
         const img = document.createElement("img");
         img.src = p.imagen || "";
-        img.style.cssText = `
-          width: 100%;
-          height: ${IMG_H};
-          object-fit: cover;
-          border-radius: 4px;
-          display: block;
-        `;
+        img.style.cssText = "width:100%; height:" + IMG_H + "; object-fit:cover; border-radius:4px; display:block;";
         card.appendChild(img);
 
-        /* Nombre */
         const n = document.createElement("div");
         n.textContent = p.nombre;
-        n.style.cssText = `
-          font-weight: 700;
-          font-size: 12px;
-          margin-top: 6px;
-          line-height: 1.2;
-          word-break: break-word;
-        `;
+        n.style.cssText = "font-weight:700; font-size:14px; margin-top:6px; line-height:1.2; word-break:break-word;";
         card.appendChild(n);
 
-        /* Precio */
         const pr = document.createElement("div");
-        pr.textContent = `$${p.precio}`;
-        pr.style.cssText = `
-          font-size: 13px;
-          font-weight: 600;
-          margin-top: 4px;
-          color: ${p.oferta ? "#d9534f" : "#003f8a"};
-        `;
+        pr.textContent = "$" + p.precio;
+        pr.style.cssText = "font-size:15px; font-weight:600; margin-top:4px; color:" + (p.oferta ? "#d9534f" : "#003f8a") + ";";
         card.appendChild(pr);
 
         grid.appendChild(card);
       });
 
-      pdfDiv.appendChild(grid);
+      wrapper.appendChild(grid);
+      pdfDiv.appendChild(wrapper);
     }
   });
 
-  /* ---- Pie ---- */
+  /* Pie */
   const pie = document.createElement("div");
-  pie.style.cssText = `
-    margin-top: 14px;
-    font-size: 10px;
-    color: #888;
-    text-align: center;
-    border-top: 1px solid #eee;
-    padding-top: 6px;
-  `;
-  pie.textContent = `${lista.length} producto${lista.length !== 1 ? "s" : ""} • Generado: ${new Date().toLocaleString("es-AR")}`;
+  pie.style.cssText = "margin-top:14px; font-size:10px; color:#888; text-align:center; border-top:1px solid #eee; padding-top:6px;";
+  pie.textContent = lista.length + " producto" + (lista.length !== 1 ? "s" : "") + " - Generado: " + new Date().toLocaleString("es-AR");
   pdfDiv.appendChild(pie);
 
-  /* ---- Generar ---- */
+  /* Generar */
   html2pdf()
     .set({
-      margin:     [0.4, 0.35, 0.4, 0.35], // [top, right, bottom, left] en pulgadas
-      filename:   "DISTRIWEST_catalogo.pdf",
-      html2canvas: {
-        scale:       2,
-        useCORS:     true,
-        logging:     false,
-        imageTimeout: 0
-      },
-      jsPDF: {
-        unit:        "in",
-        format:      "a4",
-        orientation: "portrait"
-      },
-      pagebreak: {
-        mode:   ["css", "legacy"],
-        before: ".page-break-before",
-        avoid:  ["div[style*='page-break-inside: avoid']"]
-      }
+      margin:      [0.4, 0.35, 0.4, 0.35],
+      filename:    "DISTRIWEST_catalogo.pdf",
+      html2canvas: { scale: 2, useCORS: true, logging: false, imageTimeout: 0 },
+      jsPDF:       { unit: "in", format: "a4", orientation: "portrait" },
+      pagebreak:   { mode: ["css", "legacy"] }
     })
     .from(pdfDiv)
     .save();
