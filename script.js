@@ -422,117 +422,201 @@ function restaurarDesdeArchivo(e) {
   reader.readAsText(file);
 }
 
-/* ---------- PDF (compacto) ---------- */
+/* ---------- PDF: 9 productos por hoja (3×3), imágenes grandes ---------- */
 function generarPDF() {
   const lista = obtenerListaFiltrada();
   if (!lista.length) return mostrarAlerta("No hay productos para generar el PDF.");
 
-  const categoriasPDF = [...new Set(lista.map(p => p.categoria || "Sin categoría"))];
-  const pdfDiv = document.createElement("div");
-  pdfDiv.style.fontFamily = "Arial, sans-serif";
-  pdfDiv.style.padding = "8px";
+  /*
+   * Dimensiones objetivo (A4 portrait, márgenes 0.4in en html2pdf):
+   *   Área útil ≈ 714px de ancho (a scale:2 internamente)
+   *   3 columnas → cada card ≈ 220px de ancho
+   *   3 filas    → cada card ≈ altura libre ≈ 270px
+   *   Imagen ocupa la mayor parte: 190px de alto
+   */
+  const CARD_W   = "210px";
+  const IMG_H    = "165px";
+  const GAP      = "8px";
+  const COLS     = 3;
 
-  // header compacto
+  const pdfDiv = document.createElement("div");
+  pdfDiv.style.cssText = `
+    font-family: Arial, sans-serif;
+    padding: 6px;
+    width: 100%;
+    box-sizing: border-box;
+  `;
+
+  /* ---- Header ---- */
   const header = document.createElement("div");
-  header.style.display = "flex";
-  header.style.alignItems = "center";
-  header.style.justifyContent = "center";
-  header.style.gap = "12px";
+  header.style.cssText = `
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #0074D9;
+  `;
 
   const logo = document.createElement("img");
   logo.src = "logo.png";
-  logo.style.width = "72px";
-  logo.style.objectFit = "contain";
+  logo.style.cssText = "width:64px; height:auto; object-fit:contain;";
   header.appendChild(logo);
 
   const htxt = document.createElement("div");
   htxt.style.textAlign = "center";
   const h1 = document.createElement("h1");
   h1.textContent = "DistriWest";
-  h1.style.margin = "0";
-  h1.style.fontSize = "18px";
+  h1.style.cssText = "margin:0; font-size:20px; color:#0074D9;";
   const h2 = document.createElement("div");
-  h2.textContent = `Generado: ${new Date().toLocaleDateString()}`;
-  h2.style.fontSize = "11px";
-  h2.style.color = "#444";
+  h2.textContent = `Catálogo — ${new Date().toLocaleDateString("es-AR")}`;
+  h2.style.cssText = "font-size:11px; color:#555; margin-top:2px;";
   htxt.appendChild(h1);
   htxt.appendChild(h2);
   header.appendChild(htxt);
   pdfDiv.appendChild(header);
 
+  /* ---- Productos agrupados por categoría ---- */
+  const categoriasPDF = [...new Set(lista.map(p => p.categoria || "Sin categoría"))];
+
   categoriasPDF.forEach(cat => {
+    /* Título de categoría */
     const secTitle = document.createElement("h2");
     secTitle.textContent = cat;
-    secTitle.style.background = "#0074D9";
-    secTitle.style.color = "white";
-    secTitle.style.padding = "6px";
-    secTitle.style.borderRadius = "4px";
-    secTitle.style.margin = "10px 0 6px 0";
+    secTitle.style.cssText = `
+      background: #0074D9;
+      color: white;
+      padding: 5px 10px;
+      border-radius: 4px;
+      margin: 12px 0 8px 0;
+      font-size: 13px;
+      page-break-after: avoid;
+    `;
     pdfDiv.appendChild(secTitle);
 
-    const grupo = document.createElement("div");
-    grupo.style.display = "flex";
-    grupo.style.flexWrap = "wrap";
-    grupo.style.justifyContent = "center";
+    const prodsCat = lista.filter(p => (p.categoria || "Sin categoría") === cat);
 
-    lista.filter(p => (p.categoria || "Sin categoría") === cat).forEach(p => {
-      const card = document.createElement("div");
-      card.style.width = "120px";
-      card.style.margin = "6px";
-      card.style.border = "1px solid #e6e6e6";
-      card.style.borderRadius = "6px";
-      card.style.padding = "6px";
-      card.style.textAlign = "center";
-      if (p.destacado) card.style.boxShadow = "0 0 0 3px rgba(255,215,0,0.12)";
-      if (p.oferta) card.style.border = "2px solid #d9534f";
+    /* Dividimos en grupos de 9 (= 1 hoja) para forzar saltos limpios */
+    for (let i = 0; i < prodsCat.length; i += 9) {
+      const grupo = prodsCat.slice(i, i + 9);
 
-      if (p.destacado || p.oferta) {
-        const et = document.createElement("div");
-        et.style.fontSize = "10px";
-        et.style.fontWeight = "700";
-        et.style.marginBottom = "4px";
-        et.textContent = p.destacado ? "⭐ DESTACADO" : (p.oferta ? "🔥 OFERTA" : "");
-        if (p.destacado) et.style.color = "#b58300";
-        if (p.oferta) et.style.color = "#b30000";
-        card.appendChild(et);
-      }
+      const grid = document.createElement("div");
+      grid.style.cssText = `
+        display: grid;
+        grid-template-columns: repeat(${COLS}, ${CARD_W});
+        gap: ${GAP};
+        justify-content: center;
+        page-break-inside: avoid;
+        margin-bottom: 6px;
+      `;
 
-      const img = document.createElement("img");
-      img.src = p.imagen || "";
-      img.style.width = "100%";
-      img.style.height = "80px";
-      img.style.objectFit = "cover";
-      img.style.borderRadius = "4px";
-      card.appendChild(img);
+      grupo.forEach(p => {
+        const card = document.createElement("div");
+        card.style.cssText = `
+          width: ${CARD_W};
+          border: 1px solid #ddd;
+          border-radius: 6px;
+          padding: 6px;
+          text-align: center;
+          box-sizing: border-box;
+          background: #fff;
+          ${p.destacado ? "border: 2px solid #ffd700; box-shadow: 0 0 0 2px rgba(255,215,0,0.15);" : ""}
+          ${p.oferta    ? "border: 2px solid #d9534f;" : ""}
+        `;
 
-      const n = document.createElement("div");
-      n.textContent = p.nombre;
-      n.style.fontWeight = "700";
-      n.style.fontSize = "12px";
-      n.style.marginTop = "6px";
-      card.appendChild(n);
+        /* Badge */
+        if (p.destacado || p.oferta) {
+          const et = document.createElement("div");
+          et.style.cssText = `
+            font-size: 10px;
+            font-weight: 700;
+            margin-bottom: 4px;
+            color: ${p.destacado ? "#b58300" : "#b30000"};
+          `;
+          et.textContent = p.destacado ? "⭐ DESTACADO" : "🔥 OFERTA";
+          card.appendChild(et);
+        }
 
-      const pr = document.createElement("div");
-      pr.textContent = `$${p.precio}`;
-      pr.style.fontSize = "12px";
-      pr.style.marginTop = "4px";
-      if (p.oferta) pr.style.color = "#d9534f";
-      card.appendChild(pr);
+        /* Imagen */
+        const img = document.createElement("img");
+        img.src = p.imagen || "";
+        img.style.cssText = `
+          width: 100%;
+          height: ${IMG_H};
+          object-fit: cover;
+          border-radius: 4px;
+          display: block;
+        `;
+        card.appendChild(img);
 
-      grupo.appendChild(card);
-    });
+        /* Nombre */
+        const n = document.createElement("div");
+        n.textContent = p.nombre;
+        n.style.cssText = `
+          font-weight: 700;
+          font-size: 12px;
+          margin-top: 6px;
+          line-height: 1.2;
+          word-break: break-word;
+        `;
+        card.appendChild(n);
 
-    pdfDiv.appendChild(grupo);
+        /* Precio */
+        const pr = document.createElement("div");
+        pr.textContent = `$${p.precio}`;
+        pr.style.cssText = `
+          font-size: 13px;
+          font-weight: 600;
+          margin-top: 4px;
+          color: ${p.oferta ? "#d9534f" : "#003f8a"};
+        `;
+        card.appendChild(pr);
+
+        grid.appendChild(card);
+      });
+
+      pdfDiv.appendChild(grid);
+    }
   });
 
+  /* ---- Pie ---- */
   const pie = document.createElement("div");
-  pie.style.marginTop = "12px";
-  pie.style.fontSize = "11px";
-  pie.style.color = "#666";
-  pie.textContent = `Productos: ${lista.length} • Generado: ${new Date().toLocaleString()}`;
+  pie.style.cssText = `
+    margin-top: 14px;
+    font-size: 10px;
+    color: #888;
+    text-align: center;
+    border-top: 1px solid #eee;
+    padding-top: 6px;
+  `;
+  pie.textContent = `${lista.length} producto${lista.length !== 1 ? "s" : ""} • Generado: ${new Date().toLocaleString("es-AR")}`;
   pdfDiv.appendChild(pie);
 
-  html2pdf().set({ margin: 0.18, filename: "DISTRIWEST_catalogo.pdf", html2canvas: { scale: 2 }, jsPDF: { unit: "in", format: "a4", orientation: "portrait" } }).from(pdfDiv).save();
+  /* ---- Generar ---- */
+  html2pdf()
+    .set({
+      margin:     [0.4, 0.35, 0.4, 0.35], // [top, right, bottom, left] en pulgadas
+      filename:   "DISTRIWEST_catalogo.pdf",
+      html2canvas: {
+        scale:       2,
+        useCORS:     true,
+        logging:     false,
+        imageTimeout: 0
+      },
+      jsPDF: {
+        unit:        "in",
+        format:      "a4",
+        orientation: "portrait"
+      },
+      pagebreak: {
+        mode:   ["css", "legacy"],
+        before: ".page-break-before",
+        avoid:  ["div[style*='page-break-inside: avoid']"]
+      }
+    })
+    .from(pdfDiv)
+    .save();
 }
 
 /* ---------- Estadísticas ---------- */
