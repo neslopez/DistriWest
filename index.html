@@ -19,10 +19,21 @@
     </div>
 
     <div class="header-actions no-imprimir">
-      <button id="btnBackup" class="btn">Backup</button>
-      
+      <button id="btnBackup" class="btn">⬇️ Backup</button>
+      <button id="btnRestore" class="btn outline">⬆️ Restaurar</button>
+      <!-- Input oculto para seleccionar el archivo de backup -->
+      <input type="file" id="inputRestore" accept=".json" style="display:none" />
     </div>
   </header>
+
+  <!-- Indicador de espacio de almacenamiento -->
+  <div class="storage-bar-wrap no-imprimir">
+    <span class="storage-label">Almacenamiento usado:</span>
+    <div class="storage-track">
+      <div id="storageBar" class="storage-fill"></div>
+    </div>
+    <span id="storagePct" class="storage-pct">0%</span>
+  </div>
 
   <nav class="controls no-imprimir">
     <div class="left-controls">
@@ -92,7 +103,7 @@
       <label>Categoría</label>
       <select id="categoria" class="input"></select>
 
-      <label>Imagen</label>
+      <label>Imagen <small class="hint">(se comprime automáticamente)</small></label>
       <input id="imagen" type="file" accept="image/*" />
       <img id="preview" class="preview" alt="preview">
 
