@@ -23,6 +23,22 @@ body{
 .logo{width:68px;height:auto;border-radius:8px}
 .brand h1{margin:0;font-size:20px;color:var(--azul)}
 .brand .tag{margin:0;font-size:12px;color:#666}
+.header-actions{display:flex;gap:8px;align-items:center}
+
+/* BARRA DE ALMACENAMIENTO */
+.storage-bar-wrap{
+  display:flex;align-items:center;gap:8px;
+  padding:4px 20px;background:#fff;border-bottom:1px solid #eee;
+  font-size:12px;color:#666;
+}
+.storage-track{
+  flex:1;max-width:200px;height:6px;background:#eee;border-radius:4px;overflow:hidden;
+}
+.storage-fill{
+  height:100%;width:0%;border-radius:4px;
+  background:#5cb85c;transition:width 0.4s,background 0.4s;
+}
+.storage-pct{font-size:12px;font-weight:600;color:#555;min-width:34px}
 
 /* CONTROLS */
 .controls{display:flex;justify-content:space-between;align-items:center;padding:12px 20px;gap:10px;background:white;border-bottom:1px solid #eee;flex-wrap:wrap}
@@ -60,9 +76,10 @@ body{
 .badge.oferta{background:#d9534f}
 
 /* MODAL */
-.modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);z-index:999}
-.modal-contenido{width:360px;background:white;padding:18px;border-radius:10px;box-shadow:0 10px 40px rgba(2,6,23,0.2)}
+.modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);z-index:99999}
+.modal-contenido{width:360px;background:white;padding:18px;border-radius:10px;box-shadow:0 10px 40px rgba(2,6,23,0.2);z-index:100000;pointer-events:auto}
 .preview{width:100%;height:120px;object-fit:cover;border-radius:6px;margin:8px 0}
+.hint{color:#888;font-weight:400;font-size:11px}
 
 /* FOOTER */
 .footer{text-align:center;padding:12px;color:#666}
@@ -74,98 +91,32 @@ body{
   .modal-contenido{width:92%}
 }
 
-/* hide in print where needed */
+/* oculto */
+.oculto{display:none !important}
+
+/* hide in print */
 .no-imprimir{display:flex}
 @media print{.no-imprimir{display:none !important}}
 
-/* FIX real: el modal debe estar arriba de todo */
-.modal {
-  z-index: 5000 !important;
-  pointer-events: auto !important;
-}
-
-/* El contenido también debe aceptar clicks */
-.modal-contenido {
-  z-index: 6000 !important;
-  pointer-events: auto !important;
-}
-
-/* Que el botón Cancelar reciba el click sí o sí */
-#cancelar {
-  position: relative;
-  z-index: 7000 !important;
-  cursor: pointer;
-}
-/* Modal siempre arriba */
-#modal {
-  z-index: 99999 !important;
-  pointer-events: auto !important;
-}
-
-/* Contenedor clickable */
-#modal .modal-contenido {
-  z-index: 100000 !important;
-  pointer-events: auto !important;
-}
-
-/* Botón cancelar asegurado */
-#cancelar {
-  cursor: pointer !important;
-  z-index: 200000 !important;
-  pointer-events: auto !important;
-}
-.oculto {
-  display: none !important;
-}
-
 @media (max-width: 480px){
-
-  .header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
+  .header{
+    flex-direction:column;
+    align-items:flex-start;
+    gap:10px;
   }
-
-  .brand h1 {
-    font-size: 18px;
-  }
-
-  .controls {
-    padding: 10px;
-    gap: 8px;
-  }
-
+  .brand h1{font-size:18px}
+  .controls{padding:10px;gap:8px}
   .controls .left-controls,
-  .controls .right-controls {
-    flex-direction: column;
-    align-items: stretch;
-    width: 100%;
+  .controls .right-controls{
+    flex-direction:column;
+    align-items:stretch;
+    width:100%;
   }
-
-  .btn {
-    width: 100%;
-    text-align: center;
-  }
-
-  .input-small {
-    width: 100%;
-  }
-
-  .cat-row {
-    flex-direction: column;
-    width: 100%;
-  }
-
-  .grid {
-    grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
-  }
-
-  .producto img {
-    height: 120px;
-  }
-
-  .acciones {
-    flex-direction: row;
-  }
-
+  .btn{width:100%;text-align:center}
+  .input-small{width:100%}
+  .cat-row{flex-direction:column;width:100%}
+  .grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
+  .producto img{height:120px}
+  .acciones{flex-direction:row}
+  .storage-track{max-width:100px}
 }
