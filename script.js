@@ -1,58 +1,92 @@
-/* script.js - Versión estable final para CatálogoFácil PRO
-   - No duplica modales
-   - Cancelar funciona (botón, clic fuera, ESC)
-   - Categoría manual (opción "Ingresar categoría...")
-   - CRUD, filtros, orden, pdf, backup/restore
+/* script.js - Versión corregida DISTRIWEST
+   FIXES:
+   - Compresión de imágenes al cargar (evita llenado de localStorage)
+   - try/catch en saveState con mensaje claro al usuario
+   - Bug de editIndex corregido (usamos id en lugar de índice de lista filtrada)
+   - Botón Restaurar backup funcional en la UI
 */
 
 /* ---------- Estado y elementos ---------- */
 let productos = JSON.parse(localStorage.getItem("productos")) || [];
-let categorias = JSON.parse(localStorage.getItem("categorias")) || []; // gestionás manualmente
+let categorias = JSON.parse(localStorage.getItem("categorias")) || [];
 
-let editIndex = null;
-/*let modoCliente = false;*/
+let editId = null; // FIX: usamos id del producto, no índice de lista filtrada
 
 const $ = id => document.getElementById(id);
 
-const contenedor = $("contenedorProductos");
-const filtro = $("filtroCategoria");
-const ordenSelect = $("orden");
-const btnAgregar = $("btnAgregar");
-const btnPDF = $("btnPDF");
-const btnLimpiar = $("btnLimpiar");
-/*const btnModo = $("btnModo");*/
-const btnBackup = $("btnBackup");
-const btnAddCategoria = $("btnAddCategoria");
+const contenedor    = $("contenedorProductos");
+const filtro        = $("filtroCategoria");
+const ordenSelect   = $("orden");
+const btnAgregar    = $("btnAgregar");
+const btnPDF        = $("btnPDF");
+const btnLimpiar    = $("btnLimpiar");
+const btnBackup     = $("btnBackup");
+const btnRestore    = $("btnRestore");
+const inputRestore  = $("inputRestore");
+const btnAddCategoria   = $("btnAddCategoria");
 const nuevaCategoriaInput = $("nuevaCategoria");
 
-const modal = $("modal");
-const modalTitulo = $("modalTitulo");
-const nombre = $("nombre");
-const precio = $("precio");
-const categoriaSelect = $("categoria"); // select en modal
-const imagen = $("imagen");
-const preview = $("preview");
-const destacado = $("destacado");
-const oferta = $("oferta");
-const btnGuardar = $("guardar");
-const btnCancelar = $("cancelar");
+const modal         = $("modal");
+const modalTitulo   = $("modalTitulo");
+const nombre        = $("nombre");
+const precio        = $("precio");
+const categoriaSelect = $("categoria");
+const imagen        = $("imagen");
+const preview       = $("preview");
+const destacado     = $("destacado");
+const oferta        = $("oferta");
+const btnGuardar    = $("guardar");
+const btnCancelar   = $("cancelar");
 
-const statTotal = $("statTotal");
-const statOfertas = $("statOfertas");
-const statDestacados = $("statDestacados");
-const statCategorias = $("statCategorias");
+const statTotal       = $("statTotal");
+const statOfertas     = $("statOfertas");
+const statDestacados  = $("statDestacados");
+const statCategorias  = $("statCategorias");
 
 /* ---------- Utilidades ---------- */
+
+// FIX: manejo de QuotaExceededError - el problema principal del cliente
 function saveState() {
-  localStorage.setItem("productos", JSON.stringify(productos));
-  localStorage.setItem("categorias", JSON.stringify(categorias));
+  try {
+    localStorage.setItem("productos", JSON.stringify(productos));
+    localStorage.setItem("categorias", JSON.stringify(categorias));
+  } catch (e) {
+    if (e.name === "QuotaExceededError" || e.name === "NS_ERROR_DOM_QUOTA_REACHED") {
+      mostrarAlerta(
+        "⚠️ ALMACENAMIENTO LLENO\n\n" +
+        "No se pudo guardar el producto porque el almacenamiento del navegador está lleno.\n\n" +
+        "Soluciones:\n" +
+        "• Hacé un Backup ahora para no perder datos.\n" +
+        "• Eliminá algunos productos que ya no uses.\n" +
+        "• Reducí el tamaño de las imágenes antes de subirlas."
+      );
+    } else {
+      mostrarAlerta("Error al guardar: " + e.message);
+    }
+  }
 }
 
 function mostrarAlerta(msg) {
   alert(msg);
 }
 
-/* Evita registrar listeners múltiples si este archivo se ejecuta otra vez */
+function usarStorageEstimado() {
+  // Estimación del espacio usado (solo en navegadores que lo soporten)
+  try {
+    const total = JSON.stringify(localStorage).length * 2; // bytes aprox (UTF-16)
+    const maxBytes = 5 * 1024 * 1024; // 5MB
+    const pct = Math.round((total / maxBytes) * 100);
+    const el = $("storageBar");
+    const elPct = $("storagePct");
+    if (el) {
+      el.style.width = Math.min(pct, 100) + "%";
+      el.style.background = pct > 80 ? "#d9534f" : pct > 60 ? "#f0ad4e" : "#5cb85c";
+    }
+    if (elPct) elPct.textContent = pct + "%";
+  } catch(_) {}
+}
+
+/* Evita registrar listeners múltiples */
 function once(fn) {
   if (fn._done) return;
   fn._done = true;
@@ -61,37 +95,35 @@ function once(fn) {
 
 /* ---------- Inicialización ---------- */
 document.addEventListener("DOMContentLoaded", () => {
-  // garantizar arrays
   if (!Array.isArray(productos)) productos = [];
   if (!Array.isArray(categorias)) categorias = [];
 
-  // render inicial
+  // Migración: asegurar que todos los productos tengan id
+  let necesitaMigracion = false;
+  productos = productos.map(p => {
+    if (!p.id) { necesitaMigracion = true; return { ...p, id: Date.now() + Math.random() }; }
+    return p;
+  });
+  if (necesitaMigracion) saveState();
+
   poblarFiltros();
   renderProductos(productos);
   actualizarStats();
+  usarStorageEstimado();
 
-  // listeners (registrar una sola vez)
   once(() => {
-    // principal
-    btnAgregar && btnAgregar.addEventListener("click", () => abrirModal(null));
-    btnGuardar && btnGuardar.addEventListener("click", onGuardarClick);
-    btnCancelar && btnCancelar.addEventListener("click", cerrarModal);
-
-    imagen && imagen.addEventListener("change", onImagenChange);
-
-    // modal: clic fuera
-    modal && modal.addEventListener("click", e => { if (e.target === modal) cerrarModal(); });
-
-    // ESC cierra modal
+    btnAgregar   && btnAgregar.addEventListener("click", () => abrirModal(null));
+    btnGuardar   && btnGuardar.addEventListener("click", onGuardarClick);
+    btnCancelar  && btnCancelar.addEventListener("click", cerrarModal);
+    imagen       && imagen.addEventListener("change", onImagenChange);
+    modal        && modal.addEventListener("click", e => { if (e.target === modal) cerrarModal(); });
     document.addEventListener("keydown", e => { if (e.key === "Escape") cerrarModal(); });
 
-    // filtros / orden
-    filtro && filtro.addEventListener("change", () => { renderProductos(obtenerListaFiltrada()); actualizarStats(); });
-    ordenSelect && ordenSelect.addEventListener("change", () => { renderProductos(obtenerListaFiltrada()); });
+    filtro       && filtro.addEventListener("change", () => { renderProductos(obtenerListaFiltrada()); actualizarStats(); });
+    ordenSelect  && ordenSelect.addEventListener("change", () => { renderProductos(obtenerListaFiltrada()); });
 
-    // PDF / limpiar / modo / backup / restore
-    btnPDF && btnPDF.addEventListener("click", generarPDF);
-    btnLimpiar && btnLimpiar.addEventListener("click", () => {
+    btnPDF       && btnPDF.addEventListener("click", generarPDF);
+    btnLimpiar   && btnLimpiar.addEventListener("click", () => {
       if (!confirm("¿Borrar todos los productos y categorias? Esta acción no se puede deshacer.")) return;
       productos = [];
       categorias = [];
@@ -99,24 +131,21 @@ document.addEventListener("DOMContentLoaded", () => {
       renderProductos(productos);
       cargarCategoriasEnSelect();
       actualizarStats();
+      usarStorageEstimado();
     });
 
-    /*btnModo && btnModo.addEventListener("click", () => {
-      modoCliente = !modoCliente;
-      document.body.classList.toggle("modo-cliente", modoCliente);
-      btnModo.textContent = modoCliente ? "Modo Admin" : "Modo Cliente";
-      renderProductos(obtenerListaFiltrada());
-    });*/
+    btnBackup    && btnBackup.addEventListener("click", descargarBackup);
 
-    btnBackup && btnBackup.addEventListener("click", descargarBackup);
-    
+    // FIX: Restore ahora funciona desde la UI
+    btnRestore   && btnRestore.addEventListener("click", () => inputRestore && inputRestore.click());
+    inputRestore && inputRestore.addEventListener("change", restaurarDesdeArchivo);
 
-    // categorias
     btnAddCategoria && btnAddCategoria.addEventListener("click", () => {
       const v = nuevaCategoriaInput && nuevaCategoriaInput.value && nuevaCategoriaInput.value.trim();
       if (!v) return mostrarAlerta("Escribe el nombre de la categoría");
       if (!categorias.includes(v)) categorias.push(v);
       saveState();
+      poblarFiltros();
       poblarCategoriasEnModal();
       nuevaCategoriaInput.value = "";
       actualizarStats();
@@ -124,48 +153,39 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-/* ---------- Categorías / filtros population ---------- */
+/* ---------- Categorías ---------- */
 function poblarFiltros() {
-  // filtro de la barra superior
   if (!filtro) return;
   const base = [
-    { value: "todas", text: "Todas las categorías" },
+    { value: "todas",      text: "Todas las categorías" },
     { value: "destacados", text: "Destacados" },
-    { value: "ofertas", text: "Ofertas" }
+    { value: "ofertas",    text: "Ofertas" }
   ];
   filtro.innerHTML = base.map(o => `<option value="${o.value}">${o.text}</option>`).join("");
-  // luego agregamos categorías custom
   categorias.forEach(cat => {
     const opt = document.createElement("option");
     opt.value = cat;
     opt.textContent = cat;
     filtro.appendChild(opt);
   });
-
-  // poblar modal select
   poblarCategoriasEnModal();
 }
 
 function poblarCategoriasEnModal() {
   if (!categoriaSelect) return;
-  // mantenemos siempre la opción manual al final
   categoriaSelect.innerHTML = "";
-  // Agregar categorías existentes
   categorias.forEach(cat => {
     const opt = document.createElement("option");
     opt.value = cat;
     opt.textContent = cat;
     categoriaSelect.appendChild(opt);
   });
-  // opción manual
   const optManual = document.createElement("option");
   optManual.value = "__manual__";
   optManual.textContent = "Ingresar categoría (manual)";
   categoriaSelect.appendChild(optManual);
 
-  // si seleccionan manual mostramos un input temporal
   categoriaSelect.onchange = () => {
-    // eliminar input manual si existe
     const existing = document.getElementById("categoriaManual");
     if (categoriaSelect.value === "__manual__") {
       if (!existing) {
@@ -181,27 +201,20 @@ function poblarCategoriasEnModal() {
     }
   };
 
-  // limpiar posible manual input
   const existing = document.getElementById("categoriaManual");
   if (existing) existing.remove();
 }
 
-/* ---------- Modal: abrir / cerrar (robusto) ---------- */
+/* ---------- Modal ---------- */
 function abrirModal(prod = null) {
-  // prevenir duplicados: cerrar cualquiera que exista
-  document.querySelectorAll("#modal").forEach(m => m.classList.remove("modal-ghost")); // no crea ghosts, defensivo
-
-  editIndex = null;
+  editId = null;
   modalTitulo && (modalTitulo.textContent = prod ? "Editar producto" : "Agregar producto");
 
-  // si viene producto prellenar
   if (prod) {
     nombre.value = prod.nombre || "";
     precio.value = prod.precio || "";
-    // si la categoria del prod no está en la lista, añadimos temporalmente como opción seleccionada
     poblarCategoriasEnModal();
     if (prod.categoria && !categorias.includes(prod.categoria)) {
-      // añadir opción temporal y seleccionarla
       const tmp = document.createElement("option");
       tmp.value = prod.categoria;
       tmp.textContent = prod.categoria;
@@ -212,10 +225,8 @@ function abrirModal(prod = null) {
     preview.style.display = prod.imagen ? "block" : "none";
     destacado.checked = !!prod.destacado;
     oferta.checked = !!prod.oferta;
-    // localizar index
-    editIndex = productos.findIndex(p => p === prod);
+    editId = prod.id; // FIX: guardamos el id, no el índice
   } else {
-    // abrir en modo nuevo
     limpiarModalFields();
     poblarCategoriasEnModal();
   }
@@ -228,23 +239,17 @@ function abrirModal(prod = null) {
 function cerrarModal() {
   modal.classList.add("oculto");
   modal.setAttribute("aria-hidden", "true");
-
   document.body.style.overflow = "auto";
-
   limpiarModalFields();
-
   const manual = document.getElementById("categoriaManual");
   if (manual) manual.remove();
-
-  editIndex = null;
+  editId = null;
 }
-
 
 function limpiarModalFields() {
   if (!nombre) return;
   nombre.value = "";
   precio.value = "";
-  // si existe select, resetear
   if (categoriaSelect) {
     if (categorias.length) categoriaSelect.value = categorias[0];
     else categoriaSelect.selectedIndex = -1;
@@ -255,77 +260,79 @@ function limpiarModalFields() {
   if (oferta) oferta.checked = false;
 }
 
-/* ---------- Imagen preview ---------- */
+/* ---------- FIX: Compresión de imágenes ----------
+   Redimensiona a máx 600px y comprime al 70% JPEG.
+   Una foto de celular pasa de ~500KB a ~30-60KB en Base64,
+   lo que permite cargar muchos más productos sin llenar localStorage.
+*/
 function onImagenChange(e) {
   const file = e.target.files ? e.target.files[0] : null;
   if (!file) return;
+
   const reader = new FileReader();
   reader.onload = ev => {
-    preview.src = ev.target.result;
-    preview.style.display = "block";
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 600;
+      const ratio = Math.min(MAX / img.width, MAX / img.height, 1);
+      const canvas = document.createElement("canvas");
+      canvas.width  = Math.round(img.width  * ratio);
+      canvas.height = Math.round(img.height * ratio);
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      const compressed = canvas.toDataURL("image/jpeg", 0.70);
+      preview.src = compressed;
+      preview.style.display = "block";
+    };
+    img.src = ev.target.result;
   };
   reader.readAsDataURL(file);
 }
 
-/* ---------- Guardar producto (desde modal) ---------- */
+/* ---------- Guardar producto ---------- */
 function onGuardarClick() {
-  // leer categoría manual si existe
   const manualInput = document.getElementById("categoriaManual");
   let categoriaValor = "";
   if (manualInput && manualInput.value.trim()) categoriaValor = manualInput.value.trim();
   else if (categoriaSelect && categoriaSelect.value && categoriaSelect.value !== "__manual__") categoriaValor = categoriaSelect.value;
-  else categoriaValor = ""; // vacío permitido según tu pedido (manual)
 
-  // validaciones básicas
   if (!nombre.value.trim()) return mostrarAlerta("Completá el nombre del producto.");
   if (!precio.value.trim()) return mostrarAlerta("Completá el precio.");
-  if (!preview.src || preview.src === "") return mostrarAlerta("Subí una imagen antes de guardar.");
+  if (!preview.src || preview.src === window.location.href) return mostrarAlerta("Subí una imagen antes de guardar.");
 
   const nuevo = {
-    nombre: nombre.value.trim(),
-    precio: Number(precio.value),
+    nombre:    nombre.value.trim(),
+    precio:    Number(precio.value),
     categoria: categoriaValor,
-    imagen: preview.src,
+    imagen:    preview.src,
     destacado: !!(destacado && destacado.checked),
-    oferta: !!(oferta && oferta.checked),
-    id: Date.now()
+    oferta:    !!(oferta && oferta.checked),
+    id:        editId || Date.now() // FIX: conservar id si es edición
   };
 
-  // si la categoría es nueva y no está en la lista, NO la agregamos automáticamente (vos querías manual)
-  // si quieses guardarla automáticamente, podríamos push(categoria) acá.
-
-  if (editIndex !== null && typeof editIndex === "number") {
-    produtosIndexGuard(nuevo);
+  if (editId !== null) {
+    // FIX: buscar por id, no por índice — funciona aunque la lista esté filtrada
+    const idx = productos.findIndex(p => p.id === editId);
+    if (idx !== -1) productos[idx] = nuevo;
+    else productos.push(nuevo);
   } else {
     productos.push(nuevo);
-    saveState();
   }
 
+  saveState();
+  usarStorageEstimado();
   renderProductos(obtenerListaFiltrada());
   actualizarStats();
   cerrarModal();
 }
 
-function produtosIndexGuard(nuevo) {
-  // Si editIndex se estableció por búsqueda, usarlo; si no, buscar por id coincidiente
-  if (editIndex !== null && typeof editIndex === "number" && productos[editIndex]) {
-    productos[editIndex] = nuevo;
-  } else {
-    // fallback: buscar por id
-    productos.push(nuevo);
-  }
-  saveState();
-}
-
-/* ---------- Render productos ---------- */
+/* ---------- Render ---------- */
 function renderProductos(list = productos) {
   if (!contenedor) return;
-  // aplicar orden
   const orden = ordenSelect ? ordenSelect.value : "default";
-  if (orden === "nombre_asc") list = list.slice().sort((a,b)=> a.nombre.localeCompare(b.nombre));
-  if (orden === "nombre_desc") list = list.slice().sort((a,b)=> b.nombre.localeCompare(a.nombre));
-  if (orden === "precio_asc") list = list.slice().sort((a,b)=> a.precio - b.precio);
-  if (orden === "precio_desc") list = list.slice().sort((a,b)=> b.precio - a.precio);
+  if (orden === "nombre_asc")  list = list.slice().sort((a,b) => a.nombre.localeCompare(b.nombre));
+  if (orden === "nombre_desc") list = list.slice().sort((a,b) => b.nombre.localeCompare(a.nombre));
+  if (orden === "precio_asc")  list = list.slice().sort((a,b) => a.precio - b.precio);
+  if (orden === "precio_desc") list = list.slice().sort((a,b) => b.precio - a.precio);
 
   contenedor.innerHTML = "";
   if (!list.length) {
@@ -333,65 +340,64 @@ function renderProductos(list = productos) {
     return;
   }
 
-  list.forEach((p, i) => {
+  list.forEach(p => {
     const div = document.createElement("div");
     div.className = "producto";
     if (p.destacado) div.classList.add("destacado");
-    if (p.oferta) div.classList.add("oferta");
+    if (p.oferta)    div.classList.add("oferta");
 
     const badges = (p.destacado ? `<div class="badge destacado">⭐ Destacado</div>` : "") +
-                   (p.oferta ? `<div class="badge oferta">🔥 Oferta</div>` : "");
+                   (p.oferta    ? `<div class="badge oferta">🔥 Oferta</div>`       : "");
 
-    // acciones admin solo si no modo cliente
     const adminHtml = `
       <div class="acciones no-imprimir">
-        <button class="btn outline" onclick="onEditar(${i})">✏️</button>
-        <button class="btn outline" onclick="onEliminar(${i})">🗑️</button>
-      </div>
-    `;
+        <button class="btn outline" onclick="onEditar('${p.id}')">✏️</button>
+        <button class="btn outline" onclick="onEliminar('${p.id}')">🗑️</button>
+      </div>`;
 
     div.innerHTML = `
       ${badges}
-      <img src="${p.imagen || ''}" alt="${p.nombre}">
+      <img src="${p.imagen || ''}" alt="${p.nombre}" loading="lazy">
       <h3>${p.nombre}</h3>
       <p class="categoria">${p.categoria || ''}</p>
       <p class="price"><b>$${p.precio}</b></p>
-      ${adminHtml}
-    `;
+      ${adminHtml}`;
+
     contenedor.appendChild(div);
   });
 }
 
-/* Exponer handlers globales para botones inline */
-window.onEditar = function(i) {
-  editIndex = i;
-  abrirModal(productos[i]);
+/* FIX: onEditar/onEliminar ahora usan id, no índice */
+window.onEditar = function(id) {
+  const prod = productos.find(p => String(p.id) === String(id));
+  if (prod) { editId = prod.id; abrirModal(prod); }
 };
-window.onEliminar = function(i) {
+window.onEliminar = function(id) {
   if (!confirm("¿Eliminar este producto?")) return;
-  productos.splice(i, 1);
+  productos = productos.filter(p => String(p.id) !== String(id));
   saveState();
   renderProductos(obtenerListaFiltrada());
   actualizarStats();
+  usarStorageEstimado();
 };
 
-/* ---------- Filtrar / lista ---------- */
+/* ---------- Filtrar ---------- */
 function obtenerListaFiltrada() {
   if (!filtro) return productos;
   const cat = filtro.value;
-  if (cat === "todas") return productos;
-  if (cat === "destacados") return productos.filter(p=>p.destacado);
-  if (cat === "ofertas") return productos.filter(p=>p.oferta);
-  return productos.filter(p=>p.categoria === cat);
+  if (cat === "todas")      return productos;
+  if (cat === "destacados") return productos.filter(p => p.destacado);
+  if (cat === "ofertas")    return productos.filter(p => p.oferta);
+  return productos.filter(p => p.categoria === cat);
 }
 
 /* ---------- Backup / Restore ---------- */
 function descargarBackup() {
   const data = { productos, categorias, creado: new Date().toISOString() };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href     = url;
   a.download = `distriwest_backup_${Date.now()}.json`;
   document.body.appendChild(a);
   a.click();
@@ -408,21 +414,32 @@ function restaurarDesdeArchivo(e) {
       const data = JSON.parse(ev.target.result);
       if (!Array.isArray(data.productos)) throw new Error("Archivo inválido");
       if (!confirm("Restaurar sobrescribirá los datos actuales. ¿Continuar?")) return;
-      productos = data.productos;
+      productos  = data.productos;
       categorias = Array.isArray(data.categorias) ? data.categorias : [];
       saveState();
       poblarFiltros();
       renderProductos(productos);
       actualizarStats();
-      mostrarAlerta("Restauración completa.");
+      usarStorageEstimado();
+      mostrarAlerta("✅ Restauración completa. Se cargaron " + productos.length + " productos.");
     } catch (err) {
       mostrarAlerta("Error al restaurar: " + err.message);
     }
   };
   reader.readAsText(file);
+  // limpiar el input para que pueda volver a usarse con el mismo archivo
+  e.target.value = "";
 }
 
-/* ---------- PDF: flujo libre, titulo pegado a primera fila ---------- */
+/* ---------- Stats ---------- */
+function actualizarStats() {
+  if (statTotal)      statTotal.textContent      = productos.length;
+  if (statOfertas)    statOfertas.textContent    = productos.filter(p => p.oferta).length;
+  if (statDestacados) statDestacados.textContent = productos.filter(p => p.destacado).length;
+  if (statCategorias) statCategorias.textContent = categorias.length;
+}
+
+/* ---------- PDF ---------- */
 function generarPDF() {
   const lista = obtenerListaFiltrada();
   if (!lista.length) return mostrarAlerta("No hay productos para generar el PDF.");
@@ -435,15 +452,12 @@ function generarPDF() {
   const pdfDiv = document.createElement("div");
   pdfDiv.style.cssText = "font-family: Arial, sans-serif; padding: 6px; width: 100%; box-sizing: border-box;";
 
-  /* Header */
   const header = document.createElement("div");
   header.style.cssText = "display:flex; align-items:center; justify-content:center; gap:14px; margin-bottom:10px; padding-bottom:8px; border-bottom:2px solid #0074D9;";
-
   const logo = document.createElement("img");
   logo.src = "logo.png";
   logo.style.cssText = "width:64px; height:auto; object-fit:contain;";
   header.appendChild(logo);
-
   const htxt = document.createElement("div");
   htxt.style.textAlign = "center";
   const h1 = document.createElement("h1");
@@ -457,73 +471,39 @@ function generarPDF() {
   header.appendChild(htxt);
   pdfDiv.appendChild(header);
 
-  /* Categorias */
   const categoriasPDF = [...new Set(lista.map(p => p.categoria || "Sin categoria"))];
 
   categoriasPDF.forEach(cat => {
     const prodsCat = lista.filter(p => (p.categoria || "Sin categoria") === cat);
-
-    /* Titulo: independiente con break-after:avoid
-       -> el motor no puede poner un salto entre el titulo y la fila siguiente
-       -> no hay bloque rigido que envuelva titulo+fila, por lo tanto no genera hueco */
     const secTitle = document.createElement("h2");
     secTitle.textContent = cat;
-    secTitle.style.cssText = [
-      "background:#0074D9",
-      "color:white",
-      "padding:7px 12px",
-      "border-radius:4px",
-      "margin:12px 0 8px 0",
-      "font-size:16px",
-      "break-after:avoid",
-      "page-break-after:avoid"
-    ].join(";") + ";";
+    secTitle.style.cssText = "background:#0074D9;color:white;padding:7px 12px;border-radius:4px;margin:12px 0 8px 0;font-size:16px;break-after:avoid;page-break-after:avoid;";
     pdfDiv.appendChild(secTitle);
 
-    /* Filas de 3 cards, cada fila indivisible */
     for (let i = 0; i < prodsCat.length; i += COLS) {
       const fila = prodsCat.slice(i, i + COLS);
-
       const wrapper = document.createElement("div");
       wrapper.style.cssText = "page-break-inside:avoid; break-inside:avoid; margin-bottom:0;";
-
       const grid = document.createElement("div");
-      grid.style.cssText = [
-        "display:grid",
-        "grid-template-columns:repeat(" + COLS + "," + CARD_W + ")",
-        "gap:" + GAP,
-        "justify-content:center",
-        "margin-bottom:8px"
-      ].join(";") + ";";
+      grid.style.cssText = `display:grid;grid-template-columns:repeat(${COLS},${CARD_W});gap:${GAP};justify-content:center;margin-bottom:8px;`;
 
       fila.forEach(p => {
         const card = document.createElement("div");
-        let cardCss = [
-          "width:" + CARD_W,
-          "border:1px solid #ddd",
-          "border-radius:6px",
-          "padding:6px",
-          "text-align:center",
-          "box-sizing:border-box",
-          "background:#fff"
-        ];
-        if (p.destacado) {
-          cardCss.push("border:2px solid #ffd700");
-          cardCss.push("box-shadow:0 0 0 2px rgba(255,215,0,0.15)");
-        }
-        if (p.oferta) cardCss.push("border:2px solid #d9534f");
+        let cardCss = [`width:${CARD_W}`, "border:1px solid #ddd", "border-radius:6px", "padding:6px", "text-align:center", "box-sizing:border-box", "background:#fff"];
+        if (p.destacado) { cardCss.push("border:2px solid #ffd700"); cardCss.push("box-shadow:0 0 0 2px rgba(255,215,0,0.15)"); }
+        if (p.oferta)    cardCss.push("border:2px solid #d9534f");
         card.style.cssText = cardCss.join(";") + ";";
 
         if (p.destacado || p.oferta) {
           const et = document.createElement("div");
-          et.style.cssText = "font-size:10px; font-weight:700; margin-bottom:4px; color:" + (p.destacado ? "#b58300" : "#b30000") + ";";
+          et.style.cssText = `font-size:10px; font-weight:700; margin-bottom:4px; color:${p.destacado ? "#b58300" : "#b30000"};`;
           et.textContent = p.destacado ? "DESTACADO" : "OFERTA";
           card.appendChild(et);
         }
 
         const img = document.createElement("img");
         img.src = p.imagen || "";
-        img.style.cssText = "width:100%; height:" + IMG_H + "; object-fit:cover; border-radius:4px; display:block;";
+        img.style.cssText = `width:100%; height:${IMG_H}; object-fit:cover; border-radius:4px; display:block;`;
         card.appendChild(img);
 
         const n = document.createElement("div");
@@ -533,7 +513,7 @@ function generarPDF() {
 
         const pr = document.createElement("div");
         pr.textContent = "$" + p.precio;
-        pr.style.cssText = "font-size:15px; font-weight:600; margin-top:4px; color:" + (p.oferta ? "#d9534f" : "#003f8a") + ";";
+        pr.style.cssText = `font-size:15px; font-weight:600; margin-top:4px; color:${p.oferta ? "#d9534f" : "#003f8a"};`;
         card.appendChild(pr);
 
         grid.appendChild(card);
@@ -544,13 +524,11 @@ function generarPDF() {
     }
   });
 
-  /* Pie */
   const pie = document.createElement("div");
   pie.style.cssText = "margin-top:14px; font-size:10px; color:#888; text-align:center; border-top:1px solid #eee; padding-top:6px;";
   pie.textContent = lista.length + " producto" + (lista.length !== 1 ? "s" : "") + " - Generado: " + new Date().toLocaleString("es-AR");
   pdfDiv.appendChild(pie);
 
-  /* Generar */
   html2pdf()
     .set({
       margin:      [0.4, 0.35, 0.4, 0.35],
@@ -563,19 +541,11 @@ function generarPDF() {
     .save();
 }
 
-/* ---------- Estadísticas ---------- */
-function actualizarStats() {
-  if (statTotal) statTotal.textContent = productos.length;
-  if (statOfertas) statOfertas.textContent = productos.filter(p => p.oferta).length;
-  if (statDestacados) statDestacados.textContent = productos.filter(p => p.destacado).length;
-  if (statCategorias) statCategorias.textContent = categorias.length;
-}
-
-/* ---------- Inicial render (seguro) ---------- */
+/* ---------- Render inicial ---------- */
 poblarFiltros();
 renderProductos(productos);
 actualizarStats();
+usarStorageEstimado();
 
-/* Exponer para debugging si hace falta */
-window._productos = productos;
+window._productos  = productos;
 window._categorias = categorias;
